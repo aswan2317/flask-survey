@@ -1,49 +1,65 @@
-from flask import Flask, request, render_template
-from surveys import Survey, Question, satisfaction_survey
+from flask import Flask, request, render_template, redirect, flash, session
+from surveys import satisfaction_survey
 
 from flask_debugtoolbar import DebugToolbarExtension
 
+
 app = Flask(__name__)
-responses = []
-
-app.debug = True
-app.config['SECRET_KEY'] = "hiii"
+app.config['SECRET_KEY'] = "secret"
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 debug = DebugToolbarExtension(app)
-
 
 @app.route('/')
 def start_survey():
-    return render_template('start.html', title=satisfaction_survey.title, instructions=satisfaction_survey.instructions)
+    # Reset the session at the start of the survey
+    session['responses'] = []
+    return render_template('start.html', survey=satisfaction_survey)
 
+@app.route('/begin', methods=['POST'])
+def begin_survey():
+    # Initialize session responses to empty list when survey begins
+    session['responses'] = []
+    return redirect('/questions/0')
 
-@app.route('/satisfaction_survey')
-def satisfaction_questions():
-    for i, question in enumerate(satisfaction_survey.questions):
-        question_text = question.question
-        choices = question.choices
-        allow_text = question.allow_text
-        # You can render a template here for each question or handle the logic as needed
-        # Example: render_template('question_template.html', question=question_text, choices=choices, allow_text=allow_text)
-        # You can also handle POST requests for submitting answ
+@app.route('/questions/<int:qid>')
+def show_question(qid):
+    responses = session.get('responses')
+    # Redirect to thank you page if all questions have been answered
+    if responses is None:
+        return redirect('/')
+    if len(responses) == len(satisfaction_survey.questions):
+        return redirect('/thankyou')
+    # Redirect to current question if out of order access is attempted
+    if len(responses) != qid:
+        flash("You're trying to access an invalid question.")
+        return redirect(f'/questions/{len(responses)}')
 
-@app.route('/questions/<int:question_index>', methods=['GET'])
-def show_question(question_index):
-    question = satisfaction_survey.questions[question_index]
-    return render_template('question.html', question=question, question_index=question_index)
+    question = satisfaction_survey.questions[qid]
+    return render_template('question.html', question_num=qid, question=question)
 
 @app.route('/answer', methods=['POST'])
 def handle_answer():
-    answer = request.form['answer']
-    question_index = int(request.form['question_index'])
-    responses.append(answer)
-    next_question_index = question_index + 1
-    if next_question_index < len(satisfaction_survey.questions):
-        return redirect(f'/questions/{next_question_index}')
+    # Retrieve the current list of responses from the session, or initialize it if not present
+    responses = session.get('responses', [])
+    # Get the new answer from the form submission
+    new_answer = request.form['answer']
+    # Append the new answer to the responses list
+    responses.append(new_answer)
+    # Update the session with the new list of responses
+    session['responses'] = responses
+
+    # Determine the next step: redirect to the next question or finish the survey
+    if len(responses) < len(satisfaction_survey.questions):
+        # Redirect to the next question
+        return redirect(f'/questions/{len(responses)}')
     else:
+        # All questions answered, redirect to the thank you page
         return redirect('/thankyou')
 
 
-
+@app.route('/thankyou')
+def thank_you():
+    return render_template('thankyou.html')
 
 
 
