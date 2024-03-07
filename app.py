@@ -15,6 +15,17 @@ debug = DebugToolbarExtension(app)
 def start_survey():
     return render_template('start.html', title=satisfaction_survey.title, instructions=satisfaction_survey.instructions)
 
+
+@app.route('/satisfaction_survey')
+def satisfaction_questions():
+    for i, question in enumerate(satisfaction_survey.questions):
+        question_text = question.question
+        choices = question.choices
+        allow_text = question.allow_text
+        # You can render a template here for each question or handle the logic as needed
+        # Example: render_template('question_template.html', question=question_text, choices=choices, allow_text=allow_text)
+        # You can also handle POST requests for submitting answ
+
 @app.route('/questions/<int:question_index>', methods=['GET'])
 def show_question(question_index):
     question = satisfaction_survey.questions[question_index]
